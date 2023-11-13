@@ -1,17 +1,17 @@
-# workerman-vmstat
-在浏览器里面显示以更友好的方式显示vmstat信息，包括内存、cpu、IO等信息。（不支持windows系统）  
+# workerman-vmstat SSE version
+Display ```vmstat``` information in the browser in a more friendly way, including memory, cpu, IO and other information. (Windows system is not supported)  
 
 ![vmstat](https://github.com/walkor/workerman-vmstat/blob/master/Web/img/vmstat.png?raw=true)
 
-## 安装
+## Install
 
-1、```git clone https://github.com/walkor/workerman-vmstat```
+1、```git clone https://github.com/joanhey/workerman-vmstat```
 
 2、``` composer install ```
 
-## 线上demo
-[http://www.workerman.net/demos/vmstat/](http://www.workerman.net/demos/vmstat/)
+## Original with websockets
+In branch ```websocket``` or 
 
-## 说明
-本应用是从[https://github.com/joewalnes/web-vmstats](https://github.com/joewalnes/web-vmstats)修改而来，主要是把后端nodejs部分改成php（workerman）运行。
+[https://github.com/walkor/workerman-vmstats](https://github.com/walkor/workerman-vmstats)
+
 

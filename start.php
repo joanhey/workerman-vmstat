@@ -14,28 +14,24 @@
 use \Workerman\Worker;
 use Workerman\Protocols\Http\Request;
 use Workerman\Protocols\Http\Response;
+use Workerman\Protocols\Http\ServerSentEvents;
 use Workerman\Connection\TcpConnection;
 
-// #### 一个web界面的vmstat工具 ####
-
-// 自动加载类
 require_once __DIR__ . '/vendor/autoload.php';
 
-$worker = new Worker('Websocket://0.0.0.0:7777');
-$worker->name = 'VMStatWorker';
-// 进程启动时，开启一个vmstat进程，并广播vmstat进程的输出给所有浏览器客户端
-$worker->onWorkerStart = function($worker)
+$sse = new Worker('http://0.0.0.0:3000');
+$sse->name = 'SSE';
+$sse->onWorkerStart = static function($sse)
 {
     // 把进程句柄存储起来，在进程关闭的时候关闭句柄
-    $worker->process_handle = popen('vmstat 1 -n', 'r');
-    if($worker->process_handle)
+    $sse->stats = popen('vmstat 1 -n', 'r');
+    if($sse->stats)
     {
-        $process_connection = new TcpConnection($worker->process_handle);
-        $process_connection->onMessage = function($process_connection, $data)use($worker)
+        $handle_connection = new TcpConnection($sse->stats);
+        $handle_connection->onMessage = static function($handle_connection, $data) use ($sse)
         {
-            foreach($worker->connections as $connection)
-            {
-                $connection->send($data);
+            foreach($sse->connections as $connection) {
+                $connection->send(new ServerSentEvents(['event' => 'stats', 'data' => $data]));
             }
         };
     }
@@ -45,17 +41,21 @@ $worker->onWorkerStart = function($worker)
     }
 };
 
-// 进程关闭时
-$worker->onWorkerStop = function($worker)
+$sse->onMessage = static function(TcpConnection $connection, Request $request)
 {
-    @shell_exec('killall vmstat');
-    @pclose($worker->process_handle);
+    if ($request->header('accept') === 'text/event-stream') {
+        $connection->send(new Response(200,
+                                        ['Content-Type' => 'text/event-stream',
+                                                'Access-Control-Allow-Origin' => '*']));
+        return;
+    };
+    
+    $connection->close('bye');
 };
 
-$worker->onConnect = function($connection)
+$sse->onWorkerStop = static function($sse)
 {
-    $connection->send("procs -----------memory---------- ---swap-- -----io---- -system-- ----cpu----\n");
-    $connection->send("r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa\n");
+    pclose($sse->stats);
 };
 
 // WebServer，用来给浏览器吐html js css
@@ -67,7 +67,7 @@ $web->name = 'web';
 
 define('WEBROOT', __DIR__ . '/Web');
 
-$web->onMessage = function (TcpConnection $connection, Request $request) {
+$web->onMessage = static function (TcpConnection $connection, Request $request) {
     $path = $request->path();
     if ($path === '/') {
         $connection->send(exec_php_file(WEBROOT.'/index.php'));
@@ -79,7 +79,7 @@ $web->onMessage = function (TcpConnection $connection, Request $request) {
         return;
     }
     // Security check! Very important!!!
-    if (strpos($file, WEBROOT) !== 0) {
+    if (!str_starts_with($file, WEBROOT)) {
         $connection->send(new Response(400));
         return;
     }
@@ -113,9 +113,7 @@ function exec_php_file($file) {
 }
 
 
-// 如果不是在根目录启动，则运行runAll方法
 if(!defined('GLOBAL_START'))
 {
     Worker::runAll();
 }
-

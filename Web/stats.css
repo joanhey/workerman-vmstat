@@ -1,5 +1,5 @@
-.template {
-    display: none !important;
+.stats li:first-child {
+    display: none;
 }
 * {
   cursor: default;
